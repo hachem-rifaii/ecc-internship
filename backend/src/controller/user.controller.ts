@@ -1,9 +1,9 @@
 require("dotenv").config();
 import { Request, Response, NextFunction } from "express";
-import userModel, { IUser } from "../model/user.model";
+import userModel from "../model/user.model";
 import ErrorHandler from "../utils/ErrorHandler";
 import { catchAsyncError } from "../middleware/catchAsyncErrors";
-import jwt, { JwtPayload,  } from "jsonwebtoken";
+import jwt, { JwtPayload } from "jsonwebtoken";
 import {
   sendToken,
   accessTokenOptions,
@@ -14,6 +14,7 @@ interface IRegistrationBody {
   name: string;
   email: string;
   password: string;
+  role?: string;
 }
 export const registrationUser = catchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -47,14 +48,14 @@ interface ILoginRequest {
 }
 export const loginUser = catchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
-    console.log("login running")
+    console.log("login running");
     try {
       console.log("Before DB call");
       const { email, password } = req.body as ILoginRequest;
       if (!email || !password) {
         return next(new ErrorHandler("Please provide email and password", 400));
       }
-      const user = await userModel.findOne({ email }).select("+password")
+      const user = await userModel.findOne({ email }).select("+password");
       console.log("get user ");
       if (!user) {
         console.log("User not found");
@@ -65,9 +66,8 @@ export const loginUser = catchAsyncError(
       if (!isPasswordMatch) {
         return next(new ErrorHandler("Invalid email or password", 401));
       }
-     sendToken(user,200,res)
+      sendToken(user, 200, res);
       console.log("User found, sending response");
-   
     } catch (error: any) {
       console.error("Error in login route:", error);
       return next(new ErrorHandler(error.message, 400));
@@ -103,12 +103,12 @@ export const updateAccessToken = catchAsyncError(
       }
 
       const accessToken = jwt.sign(
-        { id: decoded.id },
+        { id: decoded.id , role : decoded.role},
         process.env.ACCESS_TOKEN as string,
         { expiresIn: "5m" }
       );
       const refreshToken = jwt.sign(
-        { id: decoded.id },
+        { id: decoded.id , role : decoded.role},
         process.env.REFRESH_TOKEN as string,
         { expiresIn: "3d" }
       );
@@ -126,16 +126,15 @@ export const updateAccessToken = catchAsyncError(
   }
 );
 
-
 export const getUserInfo = catchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userID = req.user?.id;
-      if(!userID){
+      if (!userID) {
         return next(new ErrorHandler("User not found", 404));
       }
       const user = await userModel.findById(userID);
-      if(!user){
+      if (!user) {
         return next(new ErrorHandler("User not found", 404));
       }
       res.status(200).json({
@@ -144,6 +143,32 @@ export const getUserInfo = catchAsyncError(
       });
     } catch (error: any) {
       return next(new ErrorHandler(error.message, 500));
+    }
+  }
+);
+
+export const createAdmin = catchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { name, email, password } = req.body;
+      const isEmailExist = await userModel.findOne({ email });
+      if (isEmailExist) {
+        return next(new ErrorHandler("Email already exists", 400));
+      }
+      const user: IRegistrationBody = {
+        name,
+        email,
+        password,
+        role: "Admin",
+      };
+      const newUser = await userModel.create(user);
+      return res.status(201).json({
+        success: true,
+        user: newUser,
+        message: "Admin created successfully",
+      })
+    } catch (error: any) {
+      return next(new ErrorHandler(error.message, 400));
     }
   }
 );

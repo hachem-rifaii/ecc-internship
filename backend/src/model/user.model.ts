@@ -7,8 +7,10 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
+  googleId?: string;
   createdAt: Date;
   updatedAt: Date;
+  role: string;
   comparePassword: (password: string) => Promise<boolean>;
   signAccessToken: () => string;
   signRefreshToken: () => string;
@@ -27,11 +29,9 @@ const userSchema = new Schema<IUser>({
       message: "Please enter a valid email address",
     },
   },
-  password: {
-    type: String,
-    minlength: [6, "Password must be at least 6 characters"],
-    select: false,
-  },
+  role: { type: String, default: "User" },
+  password: { type: String, minlength: 6 },
+  googleId: { type: String, required: false, sparse: true, unique: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
@@ -48,17 +48,24 @@ userSchema.methods.signAccessToken = function () {
   console.log("User ID:", this._id); // تأكد من أن الـ ID موجود
   console.log("Access Token Secret:", process.env.ACCESS_TOKEN); // تحقق من المفتاح السري
 
-  return jwt.sign({ id: this._id }, process.env.ACCESS_TOKEN || "", {
-    expiresIn: "5m",
-  });
+  return jwt.sign(
+    { id: this._id, role: this.role },
+    process.env.ACCESS_TOKEN || "",
+    {
+      expiresIn: "5m",
+    }
+  );
 };
-
 
 // sign refresh token
 userSchema.methods.signRefreshToken = function () {
-  return jwt.sign({ id: this._id }, process.env.REFRESH_TOKEN || "", {
-    expiresIn: "3d",
-  });
+  return jwt.sign(
+    { id: this._id, role: this.role },
+    process.env.REFRESH_TOKEN || "",
+    {
+      expiresIn: "3d",
+    }
+  );
 };
 
 // compare password

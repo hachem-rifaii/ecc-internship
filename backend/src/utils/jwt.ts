@@ -50,3 +50,5 @@ export const sendToken = (user: IUser, statusCode: number, res: Response) => {
     accessToken,
   });
 };
+
+
